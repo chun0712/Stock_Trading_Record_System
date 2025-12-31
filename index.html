@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票交易記錄系統</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 30px 20px;
+            margin-bottom: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        /* Search & Filter Bar */
+        .search-filter-bar {
+            background: var(--card);
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .search-filter-left {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-filter-right {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            padding: 10px 14px 10px 40px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            width: 250px;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1rem;
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+
+        .stat-card h3 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .stat-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .stat-card .value.positive { color: var(--success); }
+        .stat-card .value.negative { color: var(--danger); }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-section {
+            background: var(--card);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .form-section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            background: var(--bg);
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            background: white;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 70px;
+        }
+
+        .image-upload {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg);
+            min-height: 120px;
+        }
+
+        .image-upload:hover {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .image-upload.has-images {
+            padding: 12px;
+        }
+
+        .image-upload input {
+            display: none;
+        }
+
+        .image-upload-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .images-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .image-preview-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .image-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer;
+        }
+
+        .image-preview-item .remove-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .image-preview-item:hover .remove-btn {
+            opacity: 1;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            width: 100%;
+            padding: 12px 24px;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        .records-section {
+            background: var(--card);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+
+        .records-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .records-header h2 {
+            font-size: 1.2rem;
+        }
+
+        .records-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .record-card {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+        }
+
+        .record-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transform: translateY(-2px);
+        }
+
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .record-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .record-title h3 {
+            font-size: 1.1rem;
+        }
+
+        .record-title .code {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .record-pnl {
+            font-size: 1.3rem;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+
+        .record-pnl.positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .record-pnl.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .record-pnl.neutral {
+            background: rgba(100, 116, 139, 0.1);
+            color: var(--text-muted);
+        }
+
+        .record-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .detail-item {
+            font-size: 0.9rem;
+        }
+
+        .detail-item span {
+            color: var(--text-muted);
+            display: block;
+            font-size: 0.8rem;
+            margin-bottom: 2px;
+        }
+
+        .record-reason, .record-note {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+
+        .record-reason h4, .record-note h4 {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .record-images {
+            margin: 12px 0;
+        }
+
+        .record-images-grid {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .record-images-grid img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 2px solid var(--border);
+        }
+
+        .record-images-grid img:hover {
+            transform: scale(1.05);
+            border-color: var(--primary);
+        }
+
+        .record-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-open {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .status-closed {
+            background: rgba(100, 116, 139, 0.1);
+            color: var(--text-muted);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 {
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            position: relative;
+            max-width: 95%;
+            max-height: 95%;
+        }
+
+        .modal img {
+            display: block;
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 8px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+        }
+
+        .modal-close {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+        }
+
+        .modal-nav {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+        }
+
+        .modal-nav.prev { left: 20px; }
+        .modal-nav.next { right: 20px; }
+
+        .modal-counter {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--text);
+            color: white;
+            padding: 14px 24px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1001;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+
+        /* File input for JSON */
+        .file-input-hidden {
+            display: none;
+        }
+
+        @media (max-width: 640px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .search-filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box input {
+                width: 100%;
+            }
+
+            .search-filter-left,
+            .search-filter-right {
+                width: 100%;
+            }
+
+            .search-filter-right {
+                justify-content: stretch;
+            }
+
+            .search-filter-right .btn {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📈 股票交易記錄系統</h1>
+            <p>記錄您的每一筆交易，追蹤投資績效</p>
+        </header>
+
+        <!-- Search & Filter Bar (Moved to top) -->
+        <div class="search-filter-bar">
+            <div class="search-filter-left">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="搜尋股票名稱或代號...">
+                </div>
+                <select id="filterStatus" class="btn btn-outline">
+                    <option value="all">全部狀態</option>
+                    <option value="open">持有中</option>
+                    <option value="closed">已平倉</option>
+                </select>
+            </div>
+            <div class="search-filter-right">
+                <button class="btn btn-success" onclick="exportToExcel()">
+                    📊 匯出 Excel
+                </button>
+                <button class="btn btn-primary" onclick="exportToJSON()">
+                    💾 匯出 JSON
+                </button>
+                <button class="btn btn-warning" onclick="document.getElementById('jsonImportInput').click()">
+                    📂 匯入 JSON
+                </button>
+                <input type="file" id="jsonImportInput" class="file-input-hidden" accept=".json" onchange="importFromJSON(event)">
+            </div>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-card">
+                <h3>總交易筆數</h3>
+                <div class="value" id="totalTrades">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>持有中</h3>
+                <div class="value" id="openTrades">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>總損益</h3>
+                <div class="value" id="totalPnL">$0</div>
+            </div>
+            <div class="stat-card">
+                <h3>勝率</h3>
+                <div class="value" id="winRate">0%</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="form-section">
+                <h2 id="formTitle">➕ 新增交易記錄</h2>
+                <form id="tradeForm">
+                    <input type="hidden" id="editId">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>股票名稱 *</label>
+                            <input type="text" id="stockName" placeholder="例：台積電" required>
+                        </div>
+                        <div class="form-group">
+                            <label>股票代號 *</label>
+                            <input type="text" id="stockCode" placeholder="例：2330" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>進場價格 *</label>
+                            <input type="number" id="entryPrice" step="0.01" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label>出場價格</label>
+                            <input type="number" id="exitPrice" step="0.01" placeholder="未平倉留空">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>進場時間 *</label>
+                            <input type="datetime-local" id="entryTime" required>
+                        </div>
+                        <div class="form-group">
+                            <label>出場時間</label>
+                            <input type="datetime-local" id="exitTime">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>股數 *</label>
+                            <input type="number" id="shares" placeholder="1000" required>
+                        </div>
+                        <div class="form-group">
+                            <label>停損點</label>
+                            <input type="number" id="stopLoss" step="0.01" placeholder="停損價格">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>進場原因</label>
+                        <textarea id="entryReason" placeholder="描述您的進場理由、技術分析或基本面考量..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>出場原因</label>
+                        <textarea id="exitReason" placeholder="描述您的出場理由、達到目標或停損..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>備註</label>
+                        <textarea id="notes" placeholder="其他備註事項..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>附加圖片（可多選）</label>
+                        <div class="image-upload" id="imageUpload">
+                            <input type="file" id="imageInput" accept="image/*" multiple>
+                            <div class="image-upload-text" id="uploadText">
+                                <span style="font-size: 2rem;">📷</span><br>
+                                點擊或拖曳上傳多張圖片
+                            </div>
+                            <div class="images-preview-grid" id="imagesPreviewGrid"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        💾 儲存記錄
+                    </button>
+                    <button type="button" class="btn btn-outline" id="cancelBtn" style="width: 100%; margin-top: 10px; display: none;">
+                        取消編輯
+                    </button>
+                </form>
+            </div>
+
+            <div class="records-section">
+                <div class="records-header">
+                    <h2>📋 交易記錄</h2>
+                    <span id="recordCount" style="color: var(--text-muted); font-size: 0.9rem;"></span>
+                </div>
+                <div class="records-grid" id="recordsGrid">
+                    <div class="empty-state">
+                        <h3>尚無交易記錄</h3>
+                        <p>開始新增您的第一筆交易吧！</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div class="modal-overlay" id="imageModal">
+        <button class="modal-close" onclick="closeImageModal()">×</button>
+        <button class="modal-nav prev" onclick="navigateImage(-1)">‹</button>
+        <button class="modal-nav next" onclick="navigateImage(1)">›</button>
+        <div class="modal">
+            <img id="modalImage" src="" alt="放大圖片">
+        </div>
+        <div class="modal-counter" id="modalCounter"></div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Data Storage
+        let trades = JSON.parse(localStorage.getItem('stockTrades')) || [];
+        let currentImages = [];
+        let modalImages = [];
+        let currentModalIndex = 0;
+
+        // DOM Elements
+        const form = document.getElementById('tradeForm');
+        const recordsGrid = document.getElementById('recordsGrid');
+        const searchInput = document.getElementById('searchInput');
+        const filterStatus = document.getElementById('filterStatus');
+        const imageUpload = document.getElementById('imageUpload');
+        const imageInput = document.getElementById('imageInput');
+        const imagesPreviewGrid = document.getElementById('imagesPreviewGrid');
+        const uploadText = document.getElementById('uploadText');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderRecords();
+            updateStats();
+            setDefaultDateTime();
+        });
+
+        // Set default entry time to now
+        function setDefaultDateTime() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('entryTime').value = now.toISOString().slice(0, 16);
+        }
+
+        // Image Upload Handling
+        imageUpload.addEventListener('click', (e) => {
+            if (e.target === imageUpload || e.target === uploadText || e.target.parentElement === uploadText) {
+                imageInput.click();
+            }
+        });
+
+        imageUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imageUpload.style.borderColor = 'var(--primary)';
+        });
+
+        imageUpload.addEventListener('dragleave', () => {
+            imageUpload.style.borderColor = 'var(--border)';
+        });
+
+        imageUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imageUpload.style.borderColor = 'var(--border)';
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+            handleImageFiles(files);
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleImageFiles(files);
+        });
+
+        function handleImageFiles(files) {
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    currentImages.push(e.target.result);
+                    renderImagePreviews();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderImagePreviews() {
+            if (currentImages.length > 0) {
+                uploadText.style.display = 'none';
+                imageUpload.classList.add('has-images');
+            } else {
+                uploadText.style.display = 'block';
+                imageUpload.classList.remove('has-images');
+            }
+
+            imagesPreviewGrid.innerHTML = currentImages.map((img, index) => `
+                <div class="image-preview-item">
+                    <img src="${img}" alt="預覽 ${index + 1}" onclick="openPreviewModal(${index})">
+                    <button type="button" class="remove-btn" onclick="removeImage(${index}, event)">×</button>
+                </div>
+            `).join('');
+        }
+
+        function openPreviewModal(index) {
+            openImageModal(currentImages, index);
+        }
+
+        function removeImage(index, event) {
+            event.stopPropagation();
+            currentImages.splice(index, 1);
+            renderImagePreviews();
+        }
+
+        function clearImages() {
+            currentImages = [];
+            imageInput.value = '';
+            renderImagePreviews();
+        }
+
+        // Form Submission
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const editId = document.getElementById('editId').value;
+            const entryPrice = parseFloat(document.getElementById('entryPrice').value);
+            const exitPrice = document.getElementById('exitPrice').value ? parseFloat(document.getElementById('exitPrice').value) : null;
+            const shares = parseInt(document.getElementById('shares').value);
+
+            const trade = {
+                id: editId || Date.now().toString(),
+                stockName: document.getElementById('stockName').value,
+                stockCode: document.getElementById('stockCode').value.toUpperCase(),
+                entryPrice,
+                exitPrice,
+                entryTime: document.getElementById('entryTime').value,
+                exitTime: document.getElementById('exitTime').value || null,
+                shares,
+                stopLoss: document.getElementById('stopLoss').value ? parseFloat(document.getElementById('stopLoss').value) : null,
+                entryReason: document.getElementById('entryReason').value,
+                exitReason: document.getElementById('exitReason').value,
+                notes: document.getElementById('notes').value,
+                images: [...currentImages],
+                pnl: exitPrice ? (exitPrice - entryPrice) * shares : null,
+                status: exitPrice ? 'closed' : 'open',
+                createdAt: editId ? trades.find(t => t.id === editId)?.createdAt : new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (editId) {
+                const index = trades.findIndex(t => t.id === editId);
+                trades[index] = trade;
+                showToast('記錄已更新！', 'success');
+            } else {
+                trades.unshift(trade);
+                showToast('記錄已新增！', 'success');
+            }
+
+            saveTrades();
+            renderRecords();
+            updateStats();
+            resetForm();
+        });
+
+        // Reset Form
+        function resetForm() {
+            form.reset();
+            document.getElementById('editId').value = '';
+            document.getElementById('formTitle').textContent = '➕ 新增交易記錄';
+            document.getElementById('submitBtn').textContent = '💾 儲存記錄';
+            document.getElementById('cancelBtn').style.display = 'none';
+            clearImages();
+            setDefaultDateTime();
+        }
+
+        document.getElementById('cancelBtn').addEventListener('click', resetForm);
+
+        // Edit Trade
+        function editTrade(id) {
+            const trade = trades.find(t => t.id === id);
+            if (!trade) return;
+
+            document.getElementById('editId').value = trade.id;
+            document.getElementById('stockName').value = trade.stockName;
+            document.getElementById('stockCode').value = trade.stockCode;
+            document.getElementById('entryPrice').value = trade.entryPrice;
+            document.getElementById('exitPrice').value = trade.exitPrice || '';
+            document.getElementById('entryTime').value = trade.entryTime;
+            document.getElementById('exitTime').value = trade.exitTime || '';
+            document.getElementById('shares').value = trade.shares;
+            document.getElementById('stopLoss').value = trade.stopLoss || '';
+            document.getElementById('entryReason').value = trade.entryReason || '';
+            document.getElementById('exitReason').value = trade.exitReason || '';
+            document.getElementById('notes').value = trade.notes || '';
+
+            currentImages = trade.images || [];
+            renderImagePreviews();
+
+            document.getElementById('formTitle').textContent = '✏️ 編輯交易記錄';
+            document.getElementById('submitBtn').textContent = '💾 更新記錄';
+            document.getElementById('cancelBtn').style.display = 'block';
+
+            document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Delete Trade
+        function deleteTrade(id) {
+            if (!confirm('確定要刪除這筆記錄嗎？')) return;
+
+            trades = trades.filter(t => t.id !== id);
+            saveTrades();
+            renderRecords();
+            updateStats();
+            showToast('記錄已刪除', 'success');
+        }
+
+        // Save to localStorage
+        function saveTrades() {
+            localStorage.setItem('stockTrades', JSON.stringify(trades));
+        }
+
+        // Render Records
+        function renderRecords() {
+            const search = searchInput.value.toLowerCase();
+            const status = filterStatus.value;
+
+            let filtered = trades.filter(trade => {
+                const matchSearch = trade.stockName.toLowerCase().includes(search) ||
+                                   trade.stockCode.toLowerCase().includes(search);
+                const matchStatus = status === 'all' || trade.status === status;
+                return matchSearch && matchStatus;
+            });
+
+            document.getElementById('recordCount').textContent = `顯示 ${filtered.length} / ${trades.length} 筆`;
+
+            if (filtered.length === 0) {
+                recordsGrid.innerHTML = `
+                    <div class="empty-state">
+                        <h3>找不到記錄</h3>
+                        <p>${trades.length === 0 ? '開始新增您的第一筆交易吧！' : '嘗試調整搜尋條件'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            recordsGrid.innerHTML = filtered.map(trade => {
+                const pnlClass = trade.pnl === null ? 'neutral' : (trade.pnl >= 0 ? 'positive' : 'negative');
+                let pnlText;
+                if (trade.pnl === null) {
+                    pnlText = '持有中';
+                } else if (trade.pnl >= 0) {
+                    pnlText = `+$${trade.pnl.toLocaleString()}`;
+                } else {
+                    pnlText = `-$${Math.abs(trade.pnl).toLocaleString()}`;
+                }
+
+                const imagesData = JSON.stringify(trade.images || []).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+                return `
+                    <div class="record-card">
+                        <div class="record-header">
+                            <div class="record-title">
+                                <span class="code">${trade.stockCode}</span>
+                                <h3>${trade.stockName}</h3>
+                                <span class="status-badge ${trade.status === 'open' ? 'status-open' : 'status-closed'}">
+                                    ${trade.status === 'open' ? '持有中' : '已平倉'}
+                                </span>
+                            </div>
+                            <div class="record-pnl ${pnlClass}">${pnlText}</div>
+                        </div>
+
+                        <div class="record-details">
+                            <div class="detail-item">
+                                <span>進場價格</span>
+                                <strong>$${trade.entryPrice.toLocaleString()}</strong>
+                            </div>
+                            <div class="detail-item">
+                                <span>出場價格</span>
+                                <strong>${trade.exitPrice ? '$' + trade.exitPrice.toLocaleString() : '-'}</strong>
+                            </div>
+                            <div class="detail-item">
+                                <span>股數</span>
+                                <strong>${trade.shares.toLocaleString()}</strong>
+                            </div>
+                            <div class="detail-item">
+                                <span>停損點</span>
+                                <strong>${trade.stopLoss ? '$' + trade.stopLoss.toLocaleString() : '-'}</strong>
+                            </div>
+                            <div class="detail-item">
+                                <span>進場時間</span>
+                                <strong>${formatDateTime(trade.entryTime)}</strong>
+                            </div>
+                            <div class="detail-item">
+                                <span>出場時間</span>
+                                <strong>${trade.exitTime ? formatDateTime(trade.exitTime) : '-'}</strong>
+                            </div>
+                        </div>
+
+                        ${trade.entryReason ? `
+                            <div class="record-reason">
+                                <h4>📥 進場原因</h4>
+                                <p>${escapeHtml(trade.entryReason)}</p>
+                            </div>
+                        ` : ''}
+
+                        ${trade.exitReason ? `
+                            <div class="record-reason">
+                                <h4>📤 出場原因</h4>
+                                <p>${escapeHtml(trade.exitReason)}</p>
+                            </div>
+                        ` : ''}
+
+                        ${trade.notes ? `
+                            <div class="record-note">
+                                <h4>💡 備註</h4>
+                                <p>${escapeHtml(trade.notes)}</p>
+                            </div>
+                        ` : ''}
+
+                        ${trade.images && trade.images.length > 0 ? `
+                            <div class="record-images">
+                                <div class="record-images-grid">
+                                    ${trade.images.map((img, idx) => `
+                                        <img src="${img}" alt="圖片 ${idx + 1}" onclick='openImageModal(${imagesData}, ${idx})'>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="record-actions">
+                            <button class="btn btn-outline btn-sm" onclick="editTrade('${trade.id}')">
+                                ✏️ 編輯
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteTrade('${trade.id}')">
+                                🗑️ 刪除
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Update Statistics
+        function updateStats() {
+            const total = trades.length;
+            const open = trades.filter(t => t.status === 'open').length;
+            const closed = trades.filter(t => t.status === 'closed');
+            const totalPnL = closed.reduce((sum, t) => sum + (t.pnl || 0), 0);
+            const wins = closed.filter(t => t.pnl > 0).length;
+            const winRate = closed.length > 0 ? (wins / closed.length * 100).toFixed(1) : 0;
+
+            document.getElementById('totalTrades').textContent = total;
+            document.getElementById('openTrades').textContent = open;
+
+            const pnlEl = document.getElementById('totalPnL');
+            if (totalPnL >= 0) {
+                pnlEl.textContent = '+$' + totalPnL.toLocaleString();
+                pnlEl.className = 'value positive';
+            } else {
+                pnlEl.textContent = '-$' + Math.abs(totalPnL).toLocaleString();
+                pnlEl.className = 'value negative';
+            }
+
+            document.getElementById('winRate').textContent = winRate + '%';
+        }
+
+        // Export to Excel
+        function exportToExcel() {
+            if (trades.length === 0) {
+                showToast('沒有可匯出的記錄', 'error');
+                return;
+            }
+
+            const exportData = trades.map(trade => ({
+                '股票名稱': trade.stockName,
+                '股票代號': trade.stockCode,
+                '進場價格': trade.entryPrice,
+                '出場價格': trade.exitPrice || '',
+                '股數': trade.shares,
+                '停損點': trade.stopLoss || '',
+                '進場時間': trade.entryTime ? formatDateTime(trade.entryTime) : '',
+                '出場時間': trade.exitTime ? formatDateTime(trade.exitTime) : '',
+                '損益': trade.pnl || '',
+                '狀態': trade.status === 'open' ? '持有中' : '已平倉',
+                '進場原因': trade.entryReason || '',
+                '出場原因': trade.exitReason || '',
+                '備註': trade.notes || '',
+                '圖片數量': (trade.images || []).length,
+                '建立時間': formatDateTime(trade.createdAt)
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '交易記錄');
+
+            const colWidths = Object.keys(exportData[0]).map(key => ({
+                wch: Math.max(key.length * 2, 12)
+            }));
+            ws['!cols'] = colWidths;
+
+            const fileName = `股票交易記錄_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            showToast('Excel 檔案已下載！', 'success');
+        }
+
+        // Export to JSON
+        function exportToJSON() {
+            if (trades.length === 0) {
+                showToast('沒有可匯出的記錄', 'error');
+                return;
+            }
+
+            const dataStr = JSON.stringify(trades, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `股票交易記錄_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('JSON 檔案已下載！可用於備份或轉移資料', 'success');
+        }
+
+        // Import from JSON
+        function importFromJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedTrades = JSON.parse(e.target.result);
+
+                    if (!Array.isArray(importedTrades)) {
+                        throw new Error('Invalid format');
+                    }
+
+                    const action = trades.length > 0
+                        ? confirm('目前已有記錄。\n\n按「確定」將合併資料（保留現有 + 匯入新資料）\n按「取消」將覆蓋現有資料')
+                        : true;
+
+                    if (action && trades.length > 0) {
+                        // Merge: add only records with different IDs
+                        const existingIds = new Set(trades.map(t => t.id));
+                        const newTrades = importedTrades.filter(t => !existingIds.has(t.id));
+                        trades = [...trades, ...newTrades];
+                        showToast(`已合併 ${newTrades.length} 筆新記錄！`, 'success');
+                    } else {
+                        // Replace
+                        trades = importedTrades;
+                        showToast(`已匯入 ${trades.length} 筆記錄！`, 'success');
+                    }
+
+                    saveTrades();
+                    renderRecords();
+                    updateStats();
+                } catch (error) {
+                    showToast('匯入失敗：檔案格式不正確', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        // Search & Filter
+        searchInput.addEventListener('input', renderRecords);
+        filterStatus.addEventListener('change', renderRecords);
+
+        // Image Modal
+        function openImageModal(images, index) {
+            if (typeof images === 'string') {
+                images = JSON.parse(images);
+            }
+            modalImages = images;
+            currentModalIndex = index;
+            updateModalImage();
+            document.getElementById('imageModal').classList.add('active');
+        }
+
+        function updateModalImage() {
+            document.getElementById('modalImage').src = modalImages[currentModalIndex];
+            document.getElementById('modalCounter').textContent = `${currentModalIndex + 1} / ${modalImages.length}`;
+
+            // Show/hide nav buttons
+            document.querySelector('.modal-nav.prev').style.display = modalImages.length > 1 ? 'flex' : 'none';
+            document.querySelector('.modal-nav.next').style.display = modalImages.length > 1 ? 'flex' : 'none';
+            document.getElementById('modalCounter').style.display = modalImages.length > 1 ? 'block' : 'none';
+        }
+
+        function navigateImage(direction) {
+            currentModalIndex = (currentModalIndex + direction + modalImages.length) % modalImages.length;
+            updateModalImage();
+        }
+
+        function closeImageModal() {
+            document.getElementById('imageModal').classList.remove('active');
+        }
+
+        document.getElementById('imageModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeImageModal();
+        });
+
+        // Toast Notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Format DateTime
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('imageModal').classList.contains('active')) {
+                if (e.key === 'Escape') closeImageModal();
+                if (e.key === 'ArrowLeft') navigateImage(-1);
+                if (e.key === 'ArrowRight') navigateImage(1);
+            } else if (e.key === 'Escape' && document.getElementById('editId').value) {
+                resetForm();
+            }
+        });
+    </script>
+</body>
+</html>
