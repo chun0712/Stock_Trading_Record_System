@@ -83,6 +83,14 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            min-width: 400px;
+        }
+
+        .search-filter-right .btn {
+            flex: 1;
+            min-width: 120px;
+            justify-content: center;
+            text-align: center;
         }
 
         .search-box {
@@ -145,11 +153,12 @@
 
         .main-content {
             display: grid;
-            grid-template-columns: 420px 1fr;
-            gap: 24px;
+            /* 修改處：將左側寬度從 540px 加大至 600px，確保時間選擇器完全不超出範圍 */
+            grid-template-columns: 600px 1fr;
+            gap: 32px;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 1280px) {
             .main-content {
                 grid-template-columns: 1fr;
             }
@@ -164,6 +173,7 @@
             height: fit-content;
             position: sticky;
             top: 20px;
+            overflow: visible;
         }
 
         .form-section h2 {
@@ -368,10 +378,24 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .records-header h2 {
             font-size: 1.2rem;
+            margin-right: auto;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .sort-buttons {
+            display: flex;
+            gap: 8px;
         }
 
         .records-grid {
@@ -675,8 +699,10 @@
                 justify-content: stretch;
             }
 
-            .search-filter-right .btn {
-                flex: 1;
+            .header-controls {
+                width: 100%;
+                justify-content: space-between;
+                margin-top: 10px;
             }
         }
     </style>
@@ -688,7 +714,7 @@
             <p>記錄您的每一筆交易，追蹤投資績效</p>
         </header>
 
-        <!-- Search & Filter Bar (Moved to top) -->
+        <!-- Search & Filter Bar -->
         <div class="search-filter-bar">
             <div class="search-filter-left">
                 <div class="search-box">
@@ -822,7 +848,17 @@
             <div class="records-section">
                 <div class="records-header">
                     <h2>📋 交易記錄</h2>
-                    <span id="recordCount" style="color: var(--text-muted); font-size: 0.9rem;"></span>
+                    <div class="header-controls">
+                        <span id="recordCount" style="color: var(--text-muted); font-size: 0.9rem;"></span>
+                        <div class="sort-buttons">
+                            <button class="btn btn-outline btn-sm" onclick="setSort('code')">
+                                🔢 代號排序
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="setSort('date')">
+                                📅 日期排序
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="records-grid" id="recordsGrid">
                     <div class="empty-state">
@@ -854,6 +890,10 @@
         let currentImages = [];
         let modalImages = [];
         let currentModalIndex = 0;
+
+        // Sorting State
+        let sortField = 'date'; // 'date' | 'code'
+        let sortOrder = 'desc'; // 'asc' | 'desc'
 
         // DOM Elements
         const form = document.getElementById('tradeForm');
@@ -1052,16 +1092,53 @@
             localStorage.setItem('stockTrades', JSON.stringify(trades));
         }
 
+        // Sorting Function
+        function setSort(field) {
+            if (sortField === field) {
+                // 如果是同一個欄位，切換順序
+                sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                // 新欄位預設順序
+                sortField = field;
+                sortOrder = field === 'date' ? 'desc' : 'asc';
+            }
+            renderRecords();
+
+            // 提示目前的排序狀態
+            const orderText = sortOrder === 'asc' ? '⬆️' : '⬇️';
+            const fieldText = field === 'code' ? '代號' : '日期';
+            showToast(`已按${fieldText}${orderText}排序`, 'success');
+        }
+
         // Render Records
         function renderRecords() {
             const search = searchInput.value.toLowerCase();
             const status = filterStatus.value;
 
+            // 1. Filter
             let filtered = trades.filter(trade => {
                 const matchSearch = trade.stockName.toLowerCase().includes(search) ||
                                    trade.stockCode.toLowerCase().includes(search);
                 const matchStatus = status === 'all' || trade.status === status;
                 return matchSearch && matchStatus;
+            });
+
+            // 2. Sort
+            filtered.sort((a, b) => {
+                let valA, valB;
+
+                if (sortField === 'code') {
+                    valA = a.stockCode;
+                    valB = b.stockCode;
+                    return sortOrder === 'asc'
+                        ? valA.localeCompare(valB)
+                        : valB.localeCompare(valA);
+                } else {
+                    // Date
+                    valA = new Date(a.entryTime).getTime();
+                    valB = new Date(b.entryTime).getTime();
+                    return sortOrder === 'asc' ? valA - valB : valB - valA;
+                }
             });
 
             document.getElementById('recordCount').textContent = `顯示 ${filtered.length} / ${trades.length} 筆`;
