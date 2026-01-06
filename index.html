@@ -153,7 +153,6 @@
 
         .main-content {
             display: grid;
-            /* 修改處：將左側寬度從 540px 加大至 600px，確保時間選擇器完全不超出範圍 */
             grid-template-columns: 600px 1fr;
             gap: 32px;
         }
@@ -497,6 +496,12 @@
             color: var(--text-muted);
             margin-bottom: 6px;
             font-weight: 500;
+        }
+
+        /* 修改處：新增此設定讓換行符號生效 */
+        .record-reason p, .record-note p {
+            white-space: pre-wrap;
+            margin-top: 4px;
         }
 
         .record-images {
