@@ -498,7 +498,6 @@
             font-weight: 500;
         }
 
-        /* 修改處：新增此設定讓換行符號生效 */
         .record-reason p, .record-note p {
             white-space: pre-wrap;
             margin-top: 4px;
@@ -754,9 +753,10 @@
                 <h3>持有中</h3>
                 <div class="value" id="openTrades">0</div>
             </div>
+            <!-- 修改處：改為總權益 -->
             <div class="stat-card">
-                <h3>總損益</h3>
-                <div class="value" id="totalPnL">$0</div>
+                <h3>總權益</h3>
+                <div class="value" id="totalEquity">$0</div>
             </div>
             <div class="stat-card">
                 <h3>勝率</h3>
@@ -809,7 +809,18 @@
                             <input type="number" id="shares" placeholder="1000" required>
                         </div>
                         <div class="form-group">
-                            <label>停損點</label>
+                            <label>Risk(1R)</label>
+                            <input type="number" id="risk" step="0.01" placeholder="單筆風險金額">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>預期停利點</label>
+                            <input type="number" id="takeProfit" step="0.01" placeholder="目標價格">
+                        </div>
+                        <div class="form-group">
+                            <label>預期停損點</label>
                             <input type="number" id="stopLoss" step="0.01" placeholder="停損價格">
                         </div>
                     </div>
@@ -824,8 +835,9 @@
                         <textarea id="exitReason" placeholder="描述您的出場理由、達到目標或停損..."></textarea>
                     </div>
 
+                    <!-- 修改處：改為備注＆情緒標記 -->
                     <div class="form-group">
-                        <label>備註</label>
+                        <label>備注＆情緒標記</label>
                         <textarea id="notes" placeholder="其他備註事項..."></textarea>
                     </div>
 
@@ -1004,6 +1016,8 @@
             const entryPrice = parseFloat(document.getElementById('entryPrice').value);
             const exitPrice = document.getElementById('exitPrice').value ? parseFloat(document.getElementById('exitPrice').value) : null;
             const shares = parseInt(document.getElementById('shares').value);
+            const risk = document.getElementById('risk').value ? parseFloat(document.getElementById('risk').value) : null;
+            const takeProfit = document.getElementById('takeProfit').value ? parseFloat(document.getElementById('takeProfit').value) : null;
 
             const trade = {
                 id: editId || Date.now().toString(),
@@ -1014,6 +1028,8 @@
                 entryTime: document.getElementById('entryTime').value,
                 exitTime: document.getElementById('exitTime').value || null,
                 shares,
+                risk,
+                takeProfit,
                 stopLoss: document.getElementById('stopLoss').value ? parseFloat(document.getElementById('stopLoss').value) : null,
                 entryReason: document.getElementById('entryReason').value,
                 exitReason: document.getElementById('exitReason').value,
@@ -1066,6 +1082,8 @@
             document.getElementById('entryTime').value = trade.entryTime;
             document.getElementById('exitTime').value = trade.exitTime || '';
             document.getElementById('shares').value = trade.shares;
+            document.getElementById('risk').value = trade.risk || '';
+            document.getElementById('takeProfit').value = trade.takeProfit || '';
             document.getElementById('stopLoss').value = trade.stopLoss || '';
             document.getElementById('entryReason').value = trade.entryReason || '';
             document.getElementById('exitReason').value = trade.exitReason || '';
@@ -1161,12 +1179,24 @@
             recordsGrid.innerHTML = filtered.map(trade => {
                 const pnlClass = trade.pnl === null ? 'neutral' : (trade.pnl >= 0 ? 'positive' : 'negative');
                 let pnlText;
-                if (trade.pnl === null) {
+
+                // 修改處：顯示 R 倍數邏輯
+                if (trade.status === 'open') {
                     pnlText = '持有中';
-                } else if (trade.pnl >= 0) {
-                    pnlText = `+$${trade.pnl.toLocaleString()}`;
                 } else {
-                    pnlText = `-$${Math.abs(trade.pnl).toLocaleString()}`;
+                    if (trade.risk && trade.risk > 0) {
+                        // 有設定 Risk，顯示 R 倍數
+                        const rValue = Math.round(trade.pnl / trade.risk);
+                        const sign = rValue > 0 ? '+' : '';
+                        pnlText = `${sign}${rValue}R`;
+                    } else {
+                        // 沒設定 Risk，回退顯示金額
+                        if (trade.pnl >= 0) {
+                            pnlText = `+$${trade.pnl.toLocaleString()}`;
+                        } else {
+                            pnlText = `-$${Math.abs(trade.pnl).toLocaleString()}`;
+                        }
+                    }
                 }
 
                 const imagesData = JSON.stringify(trade.images || []).replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -1197,8 +1227,16 @@
                                 <span>股數</span>
                                 <strong>${trade.shares.toLocaleString()}</strong>
                             </div>
+                             <div class="detail-item">
+                                <span>Risk(1R)</span>
+                                <strong>${trade.risk ? '$' + trade.risk.toLocaleString() : '-'}</strong>
+                            </div>
                             <div class="detail-item">
-                                <span>停損點</span>
+                                <span>預期停利</span>
+                                <strong>${trade.takeProfit ? '$' + trade.takeProfit.toLocaleString() : '-'}</strong>
+                            </div>
+                            <div class="detail-item">
+                                <span>預期停損</span>
                                 <strong>${trade.stopLoss ? '$' + trade.stopLoss.toLocaleString() : '-'}</strong>
                             </div>
                             <div class="detail-item">
@@ -1227,7 +1265,8 @@
 
                         ${trade.notes ? `
                             <div class="record-note">
-                                <h4>💡 備註</h4>
+                                <!-- 修改處：標題文字更新 -->
+                                <h4>💡 備注＆情緒標記</h4>
                                 <p>${escapeHtml(trade.notes)}</p>
                             </div>
                         ` : ''}
@@ -1267,19 +1306,29 @@
             const total = trades.length;
             const open = trades.filter(t => t.status === 'open').length;
             const closed = trades.filter(t => t.status === 'closed');
-            const totalPnL = closed.reduce((sum, t) => sum + (t.pnl || 0), 0);
+
+            // 修改處：計算總 R 倍數
+            let totalR = 0;
+            closed.forEach(t => {
+                if (t.risk && t.risk > 0) {
+                    totalR += Math.round(t.pnl / t.risk);
+                }
+            });
+
             const wins = closed.filter(t => t.pnl > 0).length;
             const winRate = closed.length > 0 ? (wins / closed.length * 100).toFixed(1) : 0;
 
             document.getElementById('totalTrades').textContent = total;
             document.getElementById('openTrades').textContent = open;
 
-            const pnlEl = document.getElementById('totalPnL');
-            if (totalPnL >= 0) {
-                pnlEl.textContent = '+$' + totalPnL.toLocaleString();
+            // 修改處：顯示總權益 (R)
+            const pnlEl = document.getElementById('totalEquity');
+            const sign = totalR > 0 ? '+' : '';
+            pnlEl.textContent = `${sign}${totalR}R`;
+
+            if (totalR >= 0) {
                 pnlEl.className = 'value positive';
             } else {
-                pnlEl.textContent = '-$' + Math.abs(totalPnL).toLocaleString();
                 pnlEl.className = 'value negative';
             }
 
@@ -1299,14 +1348,17 @@
                 '進場價格': trade.entryPrice,
                 '出場價格': trade.exitPrice || '',
                 '股數': trade.shares,
-                '停損點': trade.stopLoss || '',
+                'Risk(1R)': trade.risk || '',
+                '預期停利點': trade.takeProfit || '',
+                '預期停損點': trade.stopLoss || '',
                 '進場時間': trade.entryTime ? formatDateTime(trade.entryTime) : '',
                 '出場時間': trade.exitTime ? formatDateTime(trade.exitTime) : '',
                 '損益': trade.pnl || '',
                 '狀態': trade.status === 'open' ? '持有中' : '已平倉',
                 '進場原因': trade.entryReason || '',
                 '出場原因': trade.exitReason || '',
-                '備註': trade.notes || '',
+                // 修改處：欄位名稱更新
+                '備注＆情緒標記': trade.notes || '',
                 '圖片數量': (trade.images || []).length,
                 '建立時間': formatDateTime(trade.createdAt)
             }));
